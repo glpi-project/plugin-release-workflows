@@ -1,0 +1,85 @@
+name: "Publish release"
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+        default: "${{ github.ref_name }}"
+      release-name:
+        required: false
+        type: string
+        default: "${{ github.ref_name }}"
+      release-body:
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  publish-release:
+    name: "Publish release"
+    runs-on: "ubuntu-latest"
+    container:
+      image: "ghcr.io/glpi-project/plugin-builder"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v4"
+        with:
+          ref: "${{ inputs.tag }}"
+          fetch-tags: true
+      - name: "Build release archive"
+        run: |
+          composer install --no-progress --no-suggest --no-interaction --prefer-dist
+          git config --global --add safe.directory $(pwd)
+          vendor/bin/plugin-release --assume-yes --dont-check --nogithub --nosign --release "${{ inputs.tag }}" --verbose
+          echo "PACKAGE_BASENAME=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2' | xargs -n 1 basename)" >> $GITHUB_ENV
+          echo "PACKAGE_PATH=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
+      - name: "Compute values"
+        run: |
+          TAG_NAME="${{ inputs.tag }}"
+          RELEASE_NAME="${{ inputs.release-name }}"
+          RELEASE_BODY="${{ inputs.release-body }}"
+          if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
+            RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
+          fi
+          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_BODY=${RELEASE_BODY}" >> $GITHUB_ENV
+      - name: "Create release"
+        uses: "actions/github-script@v7"
+        with:
+          script: |
+            try {
+              const fs = await import('fs');
+              const release = await github.rest.repos.createRelease(
+                {
+                  tag_name: process.env.TAG_NAME,
+                  name: process.env.RELEASE_NAME,
+                  body: process.env.RELEASE_BODY,
+                  draft: true,
+                  prerelease: false,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                }
+              );
+              await github.rest.repos.uploadReleaseAsset(
+                {
+                  release_id: release.data.id,
+                  name: process.env.PACKAGE_BASENAME,
+                  data: fs.readFileSync(process.env.PACKAGE_PATH),
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                }
+              );
+              await github.rest.repos.updateRelease(
+                {
+                  release_id: release.data.id,
+                  draft: false,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                }
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+            }
