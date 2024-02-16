@@ -30,7 +30,7 @@ jobs:
             CREATE_TAG=yes
           fi
           echo "CREATE_TAG=${CREATE_TAG}" >> $GITHUB_ENV
-      - name: "Create release"
+      - name: "Create tag"
         if: ${{ env.CREATE_TAG == 'yes' }}
         uses: "actions/github-script@v7"
         with:
