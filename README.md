@@ -6,9 +6,10 @@ This workflow will publish a release corresponding to the given tag.
 
 You can use this workflow using the following Github Actions configuration.
 The only requirement is the presence of the `glpi-project/tools` in the composer (dev) dependencies of the plugin.
+This workflow will require the `contents: "write"` permission to be able to create a release.
 
 ```yaml
-name: "Plugin release"
+name: "Publish release"
 
 on:
   push:
@@ -17,6 +18,8 @@ on:
 
 jobs:
   publish-release:
+    permissions:
+      contents: "write"
     name: "Publish release"
     uses: "glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1"
     with:
