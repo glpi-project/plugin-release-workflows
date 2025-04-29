@@ -43,7 +43,6 @@ jobs:
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
-          # Determine if the release is a prerelease
           if [[ "${TAG_NAME}" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
             PRERELEASE="true"
           else
