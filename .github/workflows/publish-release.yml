@@ -45,9 +45,9 @@ jobs:
           fi
           # Determine if the release is a prerelease
           if [[ "${TAG_NAME}" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
-            PRERELEASE=true
+            PRERELEASE="true"
           else
-            PRERELEASE=false
+            PRERELEASE="false"
           fi
           echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
