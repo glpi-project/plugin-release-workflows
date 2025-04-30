@@ -36,7 +36,6 @@ jobs:
           echo "PACKAGE_BASENAME=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2' | xargs -n 1 basename)" >> $GITHUB_ENV
           echo "PACKAGE_PATH=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
       - name: "Compute values"
-        shell: bash
         run: |
           TAG_NAME="${{ inputs.tag }}"
           RELEASE_NAME="${{ inputs.release-name }}"
@@ -44,7 +43,7 @@ jobs:
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
-          if [[ "${TAG_NAME}" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
+          if [[ $( echo ${TAG_NAME} | grep -E "\-(alpha|beta|rc)[0-9]*$" ) ]];
             PRERELEASE="true"
           else
             PRERELEASE="false"
