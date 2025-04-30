@@ -36,6 +36,7 @@ jobs:
           echo "PACKAGE_BASENAME=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2' | xargs -n 1 basename)" >> $GITHUB_ENV
           echo "PACKAGE_PATH=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
       - name: "Compute values"
+        shell: bash
         run: |
           TAG_NAME="${{ inputs.tag }}"
           RELEASE_NAME="${{ inputs.release-name }}"
