@@ -43,7 +43,7 @@ jobs:
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
-          if [[ $( echo ${TAG_NAME} | grep -E "\-(alpha|beta|rc)[0-9]*$" ) ]];
+          if [[ $( echo ${TAG_NAME} | grep -E "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
             PRERELEASE="true"
           else
             PRERELEASE="false"
