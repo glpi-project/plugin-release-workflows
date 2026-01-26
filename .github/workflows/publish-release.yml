@@ -21,21 +21,39 @@ jobs:
     name: "Publish release"
     runs-on: "ubuntu-latest"
     container:
-      image: "ghcr.io/glpi-project/plugin-builder"
+      image: "ghcr.io/glpi-project/githubactions-glpi-apache:latest"
     steps:
-      - name: "Checkout"
-        uses: "actions/checkout@v7"
+      - name: "Checkout setup.php"
+        uses: "actions/checkout@v6"
+        with:
+          ref: "${{ inputs.tag }}"
+          sparse-checkout: setup.php
+          path: tmp_setup
+      - name: "Get Plugin Key"
+        run: |
+          PLUGIN_KEY=$(sed --quiet 's/.*function plugin_version_\([a-z0-9_]\+\).*/\1/p' tmp_setup/setup.php | head --lines=1)
+          if [ -z "$PLUGIN_KEY" ]; then
+            echo "Could not extract plugin key from setup.php"
+            exit 1
+          fi
+          echo "PLUGIN_KEY=$PLUGIN_KEY" >> $GITHUB_ENV
+      - name: "Checkout Plugin"
+        uses: "actions/checkout@v6"
         with:
           ref: "${{ inputs.tag }}"
           fetch-tags: true
-      - name: "Build release archive"
+          path: plugins/${{ env.PLUGIN_KEY }}
+      - name: "Link Plugin to GLPI"
         run: |
-          composer install --no-progress --no-suggest --no-interaction --prefer-dist
-          git config --global --add safe.directory $(pwd)
-          vendor/bin/plugin-release --assume-yes --dont-check --nogithub --nosign --release "${{ inputs.tag }}" --verbose
-          echo "PACKAGE_BASENAME=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2' | xargs -n 1 basename)" >> $GITHUB_ENV
-          echo "PACKAGE_PATH=$(find "$(pwd)/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
+          sudo ln -s $GITHUB_WORKSPACE/plugins/$PLUGIN_KEY /var/www/glpi/plugins/$PLUGIN_KEY
+      - name: "Build release archive"
+        working-directory: /var/www/glpi/
+        run: |
+          php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --no-interaction --force --verbose
+          echo "PACKAGE_BASENAME=$(find "plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2' | xargs --max-args=1 basename)" >> $GITHUB_ENV
+          echo "PACKAGE_PATH=$(find "/var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
       - name: "Compute values"
+        working-directory: /var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/
         run: |
           TAG_NAME="${{ inputs.tag }}"
           RELEASE_NAME="${{ inputs.release-name }}"
@@ -53,7 +71,7 @@ jobs:
               RELEASE_BODY="${COMPAT}"
             fi
           fi
-          if [[ $( echo ${TAG_NAME} | grep -E "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
+          if [[ $( echo ${TAG_NAME} | grep --extended-regexp "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
             PRERELEASE="true"
           else
             PRERELEASE="false"
