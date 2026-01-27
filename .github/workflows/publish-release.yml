@@ -21,7 +21,7 @@ jobs:
     name: "Publish release"
     runs-on: "ubuntu-latest"
     container:
-      image: "ghcr.io/froozeify/githubactions-glpi-apache:latest" #TODO: Change this for glpi-project once core tools is migrated in official 11.0/bf
+      image: "ghcr.io/glpi-project/githubactions-glpi-apache:latest"
       options: --user 1001 # using built-in image user, otherwise GitHub Actions can't write file to the container
     steps:
       - name: "Checkout setup.php"
