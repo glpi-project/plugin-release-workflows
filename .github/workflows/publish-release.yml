@@ -21,7 +21,8 @@ jobs:
     name: "Publish release"
     runs-on: "ubuntu-latest"
     container:
-      image: "ghcr.io/glpi-project/githubactions-glpi-apache:latest"
+      image: "ghcr.io/froozeify/githubactions-glpi-apache:latest" #TODO: Change this for glpi-project once core tools is migrated in official 11.0/bf
+      options: --user 1001 # using built-in image user, otherwise GitHub Actions can't write file to the container
     steps:
       - name: "Checkout setup.php"
         uses: "actions/checkout@v6"
@@ -42,10 +43,16 @@ jobs:
         with:
           ref: "${{ inputs.tag }}"
           fetch-tags: true
+          fetch-depth: 0
           path: plugins/${{ env.PLUGIN_KEY }}
       - name: "Link Plugin to GLPI"
         run: |
           sudo ln -s $GITHUB_WORKSPACE/plugins/$PLUGIN_KEY /var/www/glpi/plugins/$PLUGIN_KEY
+          # Fix permissions for logs and other writable dirs
+          sudo mkdir -p /var/www/glpi/tests/files/_log
+          sudo chmod -R 777 /var/www/glpi/
+          # Ensure git trusts the directory
+          git config --global --add safe.directory '*'
       - name: "Build release archive"
         working-directory: /var/www/glpi/
         run: |
