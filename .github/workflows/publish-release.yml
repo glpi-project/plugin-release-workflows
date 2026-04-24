@@ -89,3 +89,25 @@ jobs:
             } catch (error) {
               core.setFailed(error.message);
             }
+      - name: "Verify XML download URL"
+        if: ${{ !cancelled() }}
+        run: |
+          XML_FILE=$(find . -maxdepth 1 -name "*.xml" | head -1)
+          if [[ -z "$XML_FILE" ]]; then
+            echo "No plugin XML file found, skipping check."
+            exit 0
+          fi
+          EXPECTED_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.TAG_NAME }}/${{ env.PACKAGE_BASENAME }}"
+          XML_URL=$(grep -oP '(?<=<download_url>)[^<]+' "$XML_FILE" | grep "/${{ env.TAG_NAME }}/" | head -1)
+          if [[ -z "$XML_URL" ]]; then
+            echo "❌ No <download_url> entry found in $XML_FILE for tag ${{ env.TAG_NAME }}"
+            echo "   Working URL: $EXPECTED_URL"
+            exit 1
+          fi
+          if [[ "$XML_URL" != "$EXPECTED_URL" ]]; then
+            echo "❌ URL mismatch in $XML_FILE:"
+            echo "   Found:       $XML_URL"
+            echo "   Working URL: $EXPECTED_URL"
+            exit 1
+          fi
+          echo "✅ XML download URL matches the published asset: $XML_URL"
