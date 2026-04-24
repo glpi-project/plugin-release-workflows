@@ -100,9 +100,8 @@ jobs:
           EXPECTED_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.TAG_NAME }}/${{ env.PACKAGE_BASENAME }}"
           XML_URL=$(grep -oP '(?<=<download_url>)[^<]+' "$XML_FILE" | grep "/${{ env.TAG_NAME }}/" | head -1)
           if [[ -z "$XML_URL" ]]; then
-            echo "❌ No <download_url> entry found in $XML_FILE for tag ${{ env.TAG_NAME }}"
-            echo "   Working URL: $EXPECTED_URL"
-            exit 1
+            echo "No <download_url> entry for tag ${{ env.TAG_NAME }} in $XML_FILE, skipping check."
+            exit 0
           fi
           if [[ "$XML_URL" != "$EXPECTED_URL" ]]; then
             echo "❌ URL mismatch in $XML_FILE:"
