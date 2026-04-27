@@ -92,7 +92,14 @@ jobs:
       - name: "Verify XML download URL"
         if: ${{ !cancelled() }}
         run: |
-          XML_FILE=$(find . -maxdepth 1 -name "*.xml" | head -1)
+          PLUGIN_KEY=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          XML_FILE=""
+          for candidate in "plugin.xml" "${PLUGIN_KEY}.xml"; do
+            if [[ -f "$candidate" ]]; then
+              XML_FILE="$candidate"
+              break
+            fi
+          done
           if [[ -z "$XML_FILE" ]]; then
             echo "No plugin XML file found, skipping check."
             exit 0
