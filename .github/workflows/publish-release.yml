@@ -43,6 +43,16 @@ jobs:
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
+          MIN_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z]+_MIN_GLPI['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null || true)
+          MAX_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z]+_MAX_GLPI['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null || true)
+          if [[ -n "${MIN_GLPI}" && -n "${MAX_GLPI}" ]]; then
+            COMPAT="**Compatible GLPI**: ${MIN_GLPI} -- ${MAX_GLPI}"
+            if [[ -n "${RELEASE_BODY}" ]]; then
+              RELEASE_BODY="${COMPAT}"$'\n\n'"${RELEASE_BODY}"
+            else
+              RELEASE_BODY="${COMPAT}"
+            fi
+          fi
           if [[ $( echo ${TAG_NAME} | grep -E "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
             PRERELEASE="true"
           else
@@ -50,7 +60,11 @@ jobs:
           fi
           echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
           echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
-          echo "RELEASE_BODY=${RELEASE_BODY}" >> $GITHUB_ENV
+          {
+            echo "RELEASE_BODY<<__BODY_EOF__"
+            echo "${RELEASE_BODY}"
+            echo "__BODY_EOF__"
+          } >> $GITHUB_ENV
           echo "PRERELEASE=${PRERELEASE}" >> $GITHUB_ENV
       - name: "Create release"
         uses: "actions/github-script@v9"
