@@ -132,8 +132,9 @@ jobs:
             }
       - name: "Verify XML download URL"
         if: ${{ !cancelled() }}
+        working-directory: plugins/${{ env.PLUGIN_KEY }}/
         run: |
-          PLUGIN_KEY=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          PLUGIN_KEY="${{ env.PLUGIN_KEY }}"
           XML_FILE=""
           for candidate in "plugin.xml" "${PLUGIN_KEY}.xml"; do
             if [[ -f "$candidate" ]]; then
