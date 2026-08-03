@@ -58,8 +58,9 @@ jobs:
         working-directory: /var/www/glpi/
         run: |
           php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --dest="plugins/${{ env.PLUGIN_KEY }}/dist/${{ env.PLUGIN_KEY }}-${{ inputs.tag }}.tar.bz2" --no-interaction --force --verbose
-          echo "PACKAGE_BASENAME=$(find "plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2' | xargs --max-args=1 basename)" >> $GITHUB_ENV
-          echo "PACKAGE_PATH=$(find "/var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
+          PACKAGE_PATH=$(find "/var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2')
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> $GITHUB_ENV
+          echo "PACKAGE_BASENAME=$(basename "$PACKAGE_PATH")" >> $GITHUB_ENV
       - name: "Compute values"
         working-directory: /var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/
         run: |
