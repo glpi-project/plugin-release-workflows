@@ -25,7 +25,7 @@ jobs:
       options: --user 1001 # using built-in image user, otherwise GitHub Actions can't write file to the container
     steps:
       - name: "Checkout setup.php"
-        uses: "actions/checkout@v6"
+        uses: "actions/checkout@v7"
         with:
           ref: "${{ inputs.tag }}"
           sparse-checkout: setup.php
@@ -39,7 +39,7 @@ jobs:
           fi
           echo "PLUGIN_KEY=$PLUGIN_KEY" >> $GITHUB_ENV
       - name: "Checkout Plugin"
-        uses: "actions/checkout@v6"
+        uses: "actions/checkout@v7"
         with:
           ref: "${{ inputs.tag }}"
           fetch-tags: true
