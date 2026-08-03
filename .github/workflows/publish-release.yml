@@ -49,8 +49,9 @@ jobs:
         run: |
           sudo ln -s $GITHUB_WORKSPACE/plugins/$PLUGIN_KEY /var/www/glpi/plugins/$PLUGIN_KEY
           # Fix permissions for logs and other writable dirs
+          # Open the whole tree for writing so any tool (present or future) can write wherever it needs to.
           sudo mkdir -p /var/www/glpi/tests/files/_log
-          sudo chmod -R 777 /var/www/glpi/
+          sudo chmod -R a+rwX /var/www/glpi/
           # Ensure git trusts the directory
           git config --global --add safe.directory '*'
       - name: "Build release archive"
