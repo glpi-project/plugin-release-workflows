@@ -56,7 +56,7 @@ jobs:
       - name: "Build release archive"
         working-directory: /var/www/glpi/
         run: |
-          php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --no-interaction --force --verbose
+          php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --dest="plugins/${{ env.PLUGIN_KEY }}/dist/${{ env.PLUGIN_KEY }}-${{ inputs.tag }}.tar.bz2" --no-interaction --force --verbose
           echo "PACKAGE_BASENAME=$(find "plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2' | xargs --max-args=1 basename)" >> $GITHUB_ENV
           echo "PACKAGE_PATH=$(find "/var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2')" >> $GITHUB_ENV
       - name: "Compute values"
