@@ -23,6 +23,8 @@ jobs:
   publish-release:
     name: "Publish release"
     runs-on: "ubuntu-latest"
+    permissions:
+      contents: "write"
     container:
       image: "ghcr.io/glpi-project/githubactions-glpi-apache:latest"
       options: --user 1001 # using built-in image user, otherwise GitHub Actions can't write file to the container
@@ -33,6 +35,7 @@ jobs:
           ref: "${{ inputs.tag }}"
           sparse-checkout: setup.php
           path: tmp_setup
+          persist-credentials: false
       - name: "Get Plugin Key"
         run: |
           PLUGIN_KEY=$(sed --quiet 's/.*function plugin_version_\([a-z0-9_]\+\).*/\1/p' tmp_setup/setup.php | head --lines=1)
@@ -40,7 +43,7 @@ jobs:
             echo "Could not extract plugin key from setup.php"
             exit 1
           fi
-          echo "PLUGIN_KEY=$PLUGIN_KEY" >> $GITHUB_ENV
+          echo "PLUGIN_KEY=$PLUGIN_KEY" >> "$GITHUB_ENV"
       - name: "Checkout Plugin"
         uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
         with:
@@ -48,9 +51,10 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
           path: plugins/${{ env.PLUGIN_KEY }}
+          persist-credentials: false
       - name: "Link Plugin to GLPI"
         run: |
-          sudo ln -s $GITHUB_WORKSPACE/plugins/$PLUGIN_KEY /var/www/glpi/plugins/$PLUGIN_KEY
+          sudo ln -s "$GITHUB_WORKSPACE/plugins/$PLUGIN_KEY" "/var/www/glpi/plugins/$PLUGIN_KEY"
           # Fix permissions for logs and other writable dirs
           # Open the whole tree for writing so any tool (present or future) can write wherever it needs to.
           sudo mkdir -p /var/www/glpi/tests/files/_log
@@ -59,17 +63,31 @@ jobs:
           git config --global --add safe.directory '*'
       - name: "Build release archive"
         working-directory: /var/www/glpi/
+        env:
+          INPUT_TAG: "${{ inputs.tag }}"
         run: |
-          php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --dest="plugins/${{ env.PLUGIN_KEY }}/dist/glpi-${{ env.PLUGIN_KEY }}-${{ inputs.tag }}.tar.bz2" --no-interaction --force --verbose
+          php bin/console tools:plugin:release --plugin=${{ env.PLUGIN_KEY }} --dest="plugins/${{ env.PLUGIN_KEY }}/dist/glpi-${{ env.PLUGIN_KEY }}-${INPUT_TAG}.tar.bz2" --no-interaction --force --verbose
           PACKAGE_PATH=$(find "/var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/dist/" -type f -name '*.tar.bz2')
-          echo "PACKAGE_PATH=$PACKAGE_PATH" >> $GITHUB_ENV
-          echo "PACKAGE_BASENAME=$(basename "$PACKAGE_PATH")" >> $GITHUB_ENV
+          DELIMITER="EOF_$(od --address-radix=n --read-bytes=16 --format=x1 /dev/urandom | tr --delete ' \n')"
+          {
+            printf '%s\n' "PACKAGE_PATH<<${DELIMITER}"
+            printf '%s\n' "${PACKAGE_PATH}"
+            printf '%s\n' "${DELIMITER}"
+            printf '%s\n' "PACKAGE_BASENAME<<${DELIMITER}"
+            basename "${PACKAGE_PATH}"
+            printf '%s\n' "${DELIMITER}"
+          } >> "$GITHUB_ENV"
       - name: "Compute values"
         working-directory: /var/www/glpi/plugins/${{ env.PLUGIN_KEY }}/
+        shell: bash -e {0}
+        env:
+          INPUT_TAG: "${{ inputs.tag }}"
+          INPUT_RELEASE_NAME: "${{ inputs.release-name }}"
+          INPUT_RELEASE_BODY: "${{ inputs.release-body }}"
         run: |
-          TAG_NAME="${{ inputs.tag }}"
-          RELEASE_NAME="${{ inputs.release-name }}"
-          RELEASE_BODY="${{ inputs.release-body }}"
+          TAG_NAME="${INPUT_TAG}"
+          RELEASE_NAME="${INPUT_RELEASE_NAME}"
+          RELEASE_BODY="${INPUT_RELEASE_BODY}"
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
@@ -83,19 +101,24 @@ jobs:
               RELEASE_BODY="${COMPAT}"
             fi
           fi
-          if [[ $( echo ${TAG_NAME} | grep --extended-regexp "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
+          if [[ $( echo "${TAG_NAME}" | grep --extended-regexp "\-(alpha|beta|rc)[0-9]*$" ) ]]; then
             PRERELEASE="true"
           else
             PRERELEASE="false"
           fi
-          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
-          echo "RELEASE_NAME=${RELEASE_NAME}" >> $GITHUB_ENV
+          DELIMITER="EOF_$(od --address-radix=n --read-bytes=16 --format=x1 /dev/urandom | tr --delete ' \n')"
           {
-            echo "RELEASE_BODY<<__BODY_EOF__"
-            echo "${RELEASE_BODY}"
-            echo "__BODY_EOF__"
-          } >> $GITHUB_ENV
-          echo "PRERELEASE=${PRERELEASE}" >> $GITHUB_ENV
+            printf '%s\n' "TAG_NAME<<${DELIMITER}"
+            printf '%s\n' "${TAG_NAME}"
+            printf '%s\n' "${DELIMITER}"
+            printf '%s\n' "RELEASE_NAME<<${DELIMITER}"
+            printf '%s\n' "${RELEASE_NAME}"
+            printf '%s\n' "${DELIMITER}"
+            printf '%s\n' "RELEASE_BODY<<${DELIMITER}"
+            printf '%s\n' "${RELEASE_BODY}"
+            printf '%s\n' "${DELIMITER}"
+          } >> "$GITHUB_ENV"
+          echo "PRERELEASE=${PRERELEASE}" >> "$GITHUB_ENV"
       - name: "Create release"
         uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
         with:
@@ -137,6 +160,7 @@ jobs:
       - name: "Verify XML download URL"
         if: ${{ !cancelled() }}
         working-directory: plugins/${{ env.PLUGIN_KEY }}/
+        shell: bash -e {0}
         run: |
           PLUGIN_KEY="${{ env.PLUGIN_KEY }}"
           XML_FILE=""
@@ -150,10 +174,10 @@ jobs:
             echo "No plugin XML file found, skipping check."
             exit 0
           fi
-          EXPECTED_URL="https://github.com/${{ github.repository }}/releases/download/${{ env.TAG_NAME }}/${{ env.PACKAGE_BASENAME }}"
-          XML_URL=$(grep -oP '(?<=<download_url>)[^<]+' "$XML_FILE" | grep "/${{ env.TAG_NAME }}/" | head -1)
+          EXPECTED_URL="https://github.com/${{ github.repository }}/releases/download/${TAG_NAME}/${PACKAGE_BASENAME}"
+          XML_URL=$(grep -oP '(?<=<download_url>)[^<]+' "$XML_FILE" | grep "/${TAG_NAME}/" | head -1)
           if [[ -z "$XML_URL" ]]; then
-            echo "No <download_url> entry for tag ${{ env.TAG_NAME }} in $XML_FILE, skipping check."
+            echo "No <download_url> entry for tag ${TAG_NAME} in $XML_FILE, skipping check."
             exit 0
           fi
           if [[ "$XML_URL" != "$EXPECTED_URL" ]]; then
