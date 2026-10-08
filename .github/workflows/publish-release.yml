@@ -23,8 +23,6 @@ jobs:
   publish-release:
     name: "Publish release"
     runs-on: "ubuntu-latest"
-    permissions:
-      contents: "write"
     container:
       image: "ghcr.io/glpi-project/githubactions-glpi-apache:latest"
       options: --user 1001 # using built-in image user, otherwise GitHub Actions can't write file to the container
