@@ -24,7 +24,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --assume-yes --no-install-recommends --quiet pcregrep
           VERSION=$(pcregrep -o1 "define\s*\(\s*['\"]PLUGIN_[A-Z]+_VERSION['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*\)" setup.php)
-          if [[ -n "${VERSION}" ]] && { [[ "${VERSION}" == *$'\n'* ]] || ! git check-ref-format "refs/tags/${VERSION}"; }; then
+          if [[ -n "${VERSION}" ]] && ! git check-ref-format "refs/tags/${VERSION}"; then
             echo "Invalid version extracted from setup.php: ${VERSION}"
             exit 1
           fi
