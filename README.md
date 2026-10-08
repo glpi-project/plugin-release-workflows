@@ -37,6 +37,19 @@ jobs:
       release-body: ""
 ```
 
+By default, the release is created using the workflow `GITHUB_TOKEN`.
+An optional `github-token` secret can be provided to create the release using another token instead (e.g. a PAT or a GitHub App installation access token).
+
+```yaml
+jobs:
+  publish-release:
+    permissions:
+      contents: write
+    uses: glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1
+    secrets:
+      github-token: ${{ secrets.RELEASE_TOKEN }}
+```
+
 ## Automatically tag new version workflow
 
 This workflow can be used to automatically create a new tag when the plugin version in its `setup` file is updated.
