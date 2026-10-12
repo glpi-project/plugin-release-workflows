@@ -66,6 +66,7 @@ jobs:
         run: |
           php bin/console tools:plugin:release --plugin="${PLUGIN_KEY}" --dest="plugins/${PLUGIN_KEY}/dist/glpi-${PLUGIN_KEY}-${INPUT_TAG}.tar.bz2" --no-interaction --force --verbose
           PACKAGE_PATH=$(find "/var/www/glpi/plugins/${PLUGIN_KEY}/dist/" -type f -name '*.tar.bz2')
+          # Use the multiline GITHUB_ENV syntax with a random delimiter, so values containing newlines are preserved and cannot end the block early or inject other variables.
           DELIMITER="EOF_$(od --address-radix=n --read-bytes=16 --format=x1 /dev/urandom | tr --delete ' \n')"
           {
             printf '%s\n' "PACKAGE_PATH<<${DELIMITER}"
@@ -104,6 +105,7 @@ jobs:
           else
             PRERELEASE="false"
           fi
+          # Use the multiline GITHUB_ENV syntax with a random delimiter, so values containing newlines are preserved and cannot end the block early or inject other variables.
           DELIMITER="EOF_$(od --address-radix=n --read-bytes=16 --format=x1 /dev/urandom | tr --delete ' \n')"
           {
             printf '%s\n' "TAG_NAME<<${DELIMITER}"
