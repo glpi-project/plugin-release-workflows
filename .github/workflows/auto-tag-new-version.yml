@@ -10,6 +10,8 @@ jobs:
   auto-tag-new-version:
     name: "Automatically tag new version"
     runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
     steps:
       - name: "Checkout"
         uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
@@ -22,14 +24,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install --assume-yes --no-install-recommends --quiet pcregrep
           VERSION=$(pcregrep -o1 "define\s*\(\s*['\"]PLUGIN_[A-Z]+_VERSION['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*\)" setup.php)
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          if [[ -n "${VERSION}" ]] && ! git check-ref-format "refs/tags/${VERSION}"; then
+            echo "Invalid version extracted from setup.php: ${VERSION}"
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
       - name: "Check if tag exists"
         run: |
           CREATE_TAG=no
-          if [[ ! -z "${{ env.VERSION }}" && -z "$(git tag -l ${{ env.VERSION }})" ]]; then
+          if [[ ! -z "${VERSION}" && -z "$(git tag -l "${VERSION}")" ]]; then
             CREATE_TAG=yes
           fi
-          echo "CREATE_TAG=${CREATE_TAG}" >> $GITHUB_ENV
+          echo "CREATE_TAG=${CREATE_TAG}" >> "$GITHUB_ENV"
       - name: "Create tag"
         if: ${{ env.CREATE_TAG == 'yes' }}
         uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
@@ -44,9 +50,9 @@ jobs:
           github-token: ${{ secrets.github-token }}
           script: |
             try {
-              github.rest.git.createRef(
+              await github.rest.git.createRef(
                 {
-                  ref: 'refs/tags/${{ env.VERSION }}',
+                  ref: `refs/tags/${process.env.VERSION}`,
                   sha: context.sha,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
