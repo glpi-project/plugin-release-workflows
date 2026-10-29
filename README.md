@@ -37,17 +37,16 @@ jobs:
       release-body: ""
 ```
 
-By default, the release is created using the workflow `GITHUB_TOKEN`.
-An optional `github-token` secret can be provided to create the release using another token instead (e.g. a PAT or a GitHub App installation access token).
+By default, the release is created using the workflow `GITHUB_TOKEN`. To use another token, see [Authentication](#authentication).
 
 ```yaml
 jobs:
   publish-release:
     permissions:
-      contents: write
-    uses: glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1
+      contents: "write"
+    uses: "glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1"
     secrets:
-      github-token: ${{ secrets.RELEASE_TOKEN }}
+      GLPI_PROJECT_BOT_PRIVATE_KEY: "${{ secrets.GLPI_PROJECT_BOT_PRIVATE_KEY }}"
 ```
 
 ## Automatically tag new version workflow
@@ -69,9 +68,18 @@ jobs:
     name: "Automatically tag new version"
     uses: "glpi-project/plugin-release-workflows/.github/workflows/auto-tag-new-version.yml@v1"
     secrets:
-      # The access token used when the new tag is pushed.
-      # This personal access token (PAT) is required to ensure that subsequent workflows that listen
-      # to the tag push event will be triggered.
-      # This PAT requires the `Content: read/write` permissions.
-      github-token: "${{ secrets.AUTOTAG_TOKEN }}"
+      GLPI_PROJECT_BOT_PRIVATE_KEY: "${{ secrets.GLPI_PROJECT_BOT_PRIVATE_KEY }}"
 ```
+
+A token other than the workflow `GITHUB_TOKEN` is required, otherwise the tag push would not trigger other workflows. See [Authentication](#authentication).
+
+## Authentication
+
+Both workflows accept, in this order of precedence:
+
+1. `bot-token` secret: a token (PAT or GitHub App token), used as is.
+2. `bot-client-id` input and `bot-private-key` secret. Used by a GitHub App with the `contents: write` permission.  
+    They default to the `GLPI_PROJECT_BOT_CLIENT_ID` variable and the `GLPI_PROJECT_BOT_PRIVATE_KEY` secret, which must be passed by name.
+3. The workflow `GITHUB_TOKEN` (publish release workflow only).
+
+`github-token` is a deprecated alias of `bot-token`, used when `bot-token` is not set.
