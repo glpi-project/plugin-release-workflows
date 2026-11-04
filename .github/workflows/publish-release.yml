@@ -102,8 +102,8 @@ jobs:
           if [[ -z "${RELEASE_BODY}" && -f "CHANGELOG.md" ]]; then
             RELEASE_BODY="See [CHANGELOG.md](CHANGELOG.md) for changes details."
           fi
-          MIN_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z]+_MIN_GLPI['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null || true)
-          MAX_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z]+_MAX_GLPI['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null || true)
+          MIN_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z0-9_]+_MIN_GLPI(?:_VERSION)?['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null | head --lines=1 || true)
+          MAX_GLPI=$(grep -oP "define\s*\(\s*['\"]PLUGIN_[A-Z0-9_]+_MAX_GLPI(?:_VERSION)?['\"]\s*,\s*['\"]\K[^'\"]+(?=['\"])" setup.php 2>/dev/null | head --lines=1 || true)
           if [[ -n "${MIN_GLPI}" && -n "${MAX_GLPI}" ]]; then
             COMPAT="**Compatible GLPI**: ${MIN_GLPI} -- ${MAX_GLPI}"
             if [[ -n "${RELEASE_BODY}" ]]; then
@@ -224,3 +224,96 @@ jobs:
             exit 1
           fi
           echo "✅ XML download URL matches the published asset: $XML_URL"
+      - name: "Open plugin XML update PR on default branch"
+        # Non-blocking: the release is already published, and consumers may lack the `pull-requests: write` permission.
+        continue-on-error: true
+        uses: "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3" # v9.0.0
+        env:
+          DEFAULT_BRANCH: "${{ github.event.repository.default_branch }}"
+        with:
+          github-token: ${{ secrets.bot-token || secrets.github-token || steps.bot-app-token.outputs.token || github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = process.env.TAG_NAME;
+            const fs = await import('fs');
+            const base = process.env.DEFAULT_BRANCH
+              || (await github.rest.repos.get({ owner, repo })).data.default_branch;
+            const pluginDir = `plugins/${process.env.PLUGIN_KEY}`;
+            const xmlPath = ['plugin.xml', `${process.env.PLUGIN_KEY}.xml`].find((candidate) => fs.existsSync(`${pluginDir}/${candidate}`));
+            if (xmlPath === undefined) {
+              core.info('No plugin XML file found, skipping update.');
+              return;
+            }
+
+            // The tag's XML already holds the block (checked by the previous step): copy it as is.
+            const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const existingRe = new RegExp(`[ \\t]*<version>\\s*<num>\\s*${escapedTag}\\s*</num>[\\s\\S]*?</version>`);
+            const block = fs.readFileSync(`${pluginDir}/${xmlPath}`, 'utf8').match(existingRe)?.[0];
+            if (block === undefined) {
+              core.info(`No <version> block for ${tag} in the tag's ${xmlPath}, skipping update.`);
+              return;
+            }
+
+            let xml;
+            try {
+              const { data } = await github.rest.repos.getContent({ owner, repo, path: xmlPath, ref: base });
+              xml = Buffer.from(data.content, 'base64').toString('utf8');
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              core.info(`No ${xmlPath} on ${base}, skipping update.`);
+              return;
+            }
+
+            let updated;
+            if (existingRe.test(xml)) {
+              updated = xml.replace(existingRe, () => block);
+            } else if (/<versions>[ \t]*\r?\n/.test(xml)) {
+              // Newest first: the block goes right after <versions>.
+              updated = xml.replace(/<versions>[ \t]*(\r?\n)/, (match, eol) => `${match}${block}${eol}`);
+            } else {
+              core.warning(`No <versions> element found in ${xmlPath} on ${base}, skipping update.`);
+              return;
+            }
+            if (updated === xml) {
+              core.info(`${xmlPath} on ${base} already contains version ${tag}.`);
+              return;
+            }
+
+            const branch = `release-xml/${tag}`;
+            const baseSha = (await github.rest.git.getRef({ owner, repo, ref: `heads/${base}` })).data.object.sha;
+            try {
+              await github.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: baseSha });
+            } catch (error) {
+              // 422: branch left by a previous run, reset it onto the default branch.
+              if (error.status !== 422) {
+                throw error;
+              }
+              await github.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: baseSha, force: true });
+            }
+            const { data: file } = await github.rest.repos.getContent({ owner, repo, path: xmlPath, ref: branch });
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path: xmlPath,
+              branch,
+              sha: file.sha,
+              message: `Add version ${tag} to ${xmlPath}`,
+              content: Buffer.from(updated, 'utf8').toString('base64'),
+            });
+
+            const { data: openPulls } = await github.rest.pulls.list({ owner, repo, head: `${owner}:${branch}`, base, state: 'open' });
+            if (openPulls.length > 0) {
+              core.info(`Updated existing PR: ${openPulls[0].html_url}`);
+              return;
+            }
+            const { data: pull } = await github.rest.pulls.create({
+              owner,
+              repo,
+              head: branch,
+              base,
+              title: `Add version ${tag} to ${xmlPath}`,
+              body: `Copies the \`${tag}\` version block from the tag's \`${xmlPath}\` to \`${base}\`, so that the plugins catalog lists it.`,
+            });
+            core.info(`Opened PR: ${pull.html_url}`);

@@ -20,6 +20,7 @@ jobs:
   publish-release:
     permissions:
       contents: "write"
+      pull-requests: "write"
     name: "Publish release"
     uses: "glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1"
     with:
@@ -44,12 +45,16 @@ jobs:
   publish-release:
     permissions:
       contents: "write"
+      pull-requests: "write"
     uses: "glpi-project/plugin-release-workflows/.github/workflows/publish-release.yml@v1"
     with:
       bot-client-id: "${{ vars.GLPI_PROJECT_BOT_CLIENT_ID }}"
     secrets:
       bot-private-key: "${{ secrets.GLPI_PROJECT_BOT_PRIVATE_KEY }}"
 ```
+
+After the release is published, the workflow copies the tag's `<version>` block from the plugin XML file (`plugin.xml` or `<plugin_key>.xml`) of the tag to the one of the default branch, through a PR: the block is inserted right after `<versions>`, or replaces the block with the same `<num>`.
+This step is non-blocking and requires the `pull-requests: "write"` permission in addition to `contents: "write"`.
 
 ## Automatically tag new version workflow
 
