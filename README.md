@@ -87,7 +87,7 @@ A token other than the workflow `GITHUB_TOKEN` is required, otherwise the tag pu
 Both workflows accept, in this order of precedence:
 
 1. `bot-token` secret: a token (PAT or GitHub App token), used as is.
-2. `bot-client-id` input and `bot-private-key` secret. Used by a GitHub App with the `contents: write` permission.
+2. `bot-client-id` input and `bot-private-key` secret. Used by a GitHub App with the `contents: write` permission, plus `pull-requests: write` for the publish release workflow.
 3. The workflow `GITHUB_TOKEN` (publish release workflow only).
 
 `github-token` is a deprecated alias of `bot-token`, used when `bot-token` is not set.
